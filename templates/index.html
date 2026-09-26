@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+
+          <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Vision Relay — False-Color & Night Vision from a Standard Webcam</title>
+                    <link rel="preconnect" href="https://fonts.googleapis.com">
+                    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+                    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap"
+                              rel="stylesheet">
+                    <style>
+                              :root {
+                                        --bg: #0a0c10;
+                                        --panel: #12151c;
+                                        --panel-alt: #171b24;
+                                        --line: #232830;
+                                        --text: #e7e9ec;
+                                        --text-dim: #8a93a1;
+                                        --text-faint: #565f6c;
+                                        --heat-cool: #3a6ff5;
+                                        --heat-mid: #f2545b;
+                                        --heat-hot: #ffc24b;
+                                        --radius: 10px;
+                                        --font-display: 'Space Grotesk', sans-serif;
+                                        --font-mono: 'JetBrains Mono', monospace;
+                              }
+
+                              * {
+                                        box-sizing: border-box;
+                              }
+
+                              html,
+                              body {
+                                        margin: 0;
+                                        padding: 0;
+                                        background: var(--bg);
+                                        color: var(--text);
+                                        font-family: var(--font-mono);
+                              }
+
+                              body {
+                                        min-height: 100vh;
+                                        display: flex;
+                                        flex-direction: column;
+                                        padding: 28px 24px 40px;
+                              }
+
+                              .wrap {
+                                        width: 100%;
+                                        max-width: 1120px;
+                                        margin: 0 auto;
+                              }
+
+                              header {
+                                        display: flex;
+                                        align-items: baseline;
+                                        justify-content: space-between;
+                                        flex-wrap: wrap;
+                                        gap: 10px 24px;
+                                        border-bottom: 1px solid var(--line);
+                                        padding-bottom: 18px;
+                                        margin-bottom: 24px;
+                              }
+
+                              .title-block h1 {
+                                        font-family: var(--font-display);
+                                        font-weight: 700;
+                                        font-size: 26px;
+                                        letter-spacing: -0.01em;
+                                        margin: 0 0 4px;
+                              }
+
+                              .title-block p {
+                                        margin: 0;
+                                        font-size: 13px;
+                                        color: var(--text-dim);
+                                        max-width: 46ch;
+                                        line-height: 1.5;
+                              }
+
+                              .live-badge {
+                                        display: inline-flex;
+                                        align-items: center;
+                                        gap: 8px;
+                                        font-size: 11px;
+                                        letter-spacing: 0.08em;
+                                        text-transform: uppercase;
+                                        color: var(--text-dim);
+                                        border: 1px solid var(--line);
+                                        border-radius: 999px;
+                                        padding: 6px 12px 6px 10px;
+                                        white-space: nowrap;
+                                        height: fit-content;
+                              }
+
+                              .live-dot {
+                                        width: 7px;
+                                        height: 7px;
+                                        border-radius: 50%;
+                                        background: var(--heat-mid);
+                                        box-shadow: 0 0 0 3px rgba(242, 84, 91, 0.18);
+                                        animation: pulse 2.2s ease-in-out infinite;
+                              }
+
+                              @keyframes pulse {
+
+                                        0%,
+                                        100% {
+                                                  opacity: 1;
+                                        }
+
+                                        50% {
+                                                  opacity: 0.35;
+                                        }
+                              }
+
+                              main {
+                                        display: grid;
+                                        grid-template-columns: minmax(0, 1.6fr) minmax(260px, 1fr);
+                                        gap: 20px;
+                                        align-items: start;
+                              }
+
+                              .feed-panel {
+                                        position: relative;
+                                        border-radius: var(--radius);
+                                        overflow: hidden;
+                                        background: #000;
+                                        border: 1px solid var(--line);
+                                        aspect-ratio: 4 / 3;
+                              }
+
+                              .feed-panel img {
+                                        width: 100%;
+                                        height: 100%;
+                                        object-fit: cover;
+                                        display: block;
+                              }
+
+                              .feed-overlay {
+                                        position: absolute;
+                                        inset: 0;
+                                        pointer-events: none;
+                                        display: flex;
+                                        flex-direction: column;
+                                        justify-content: space-between;
+                                        padding: 14px;
+                              }
+
+                              .feed-overlay .row {
+                                        display: flex;
+                                        justify-content: space-between;
+                                        font-size: 11px;
+                                        color: rgba(231, 233, 236, 0.85);
+                                        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+                              }
+
+                              .feed-overlay .corner {
+                                        width: 18px;
+                                        height: 18px;
+                                        border-color: rgba(231, 233, 236, 0.5);
+                              }
+
+                              .frame-corners span {
+                                        position: absolute;
+                                        width: 16px;
+                                        height: 16px;
+                                        border: 1.5px solid rgba(231, 233, 236, 0.45);
+                              }
+
+                              .frame-corners span:nth-child(1) {
+                                        top: 12px;
+                                        left: 12px;
+                                        border-right: none;
+                                        border-bottom: none;
+                              }
+
+                              .frame-corners span:nth-child(2) {
+                                        top: 12px;
+                                        right: 12px;
+                                        border-left: none;
+                                        border-bottom: none;
+                              }
+
+                              .frame-corners span:nth-child(3) {
+                                        bottom: 12px;
+                                        left: 12px;
+                                        border-right: none;
+                                        border-top: none;
+                              }
+
+                              .frame-corners span:nth-child(4) {
+                                        bottom: 12px;
+                                        right: 12px;
+                                        border-left: none;
+                                        border-top: none;
+                              }
+
+                              .side {
+                                        display: flex;
+                                        flex-direction: column;
+                                        gap: 14px;
+                              }
+
+                              .panel {
+                                        background: var(--panel);
+                                        border: 1px solid var(--line);
+                                        border-radius: var(--radius);
+                                        padding: 16px;
+                              }
+
+                              .panel h2 {
+                                        font-family: var(--font-display);
+                                        font-size: 13px;
+                                        font-weight: 500;
+                                        margin: 0 0 12px;
+                                        color: var(--text);
+                              }
+
+                              .modes {
+                                        display: flex;
+                                        flex-direction: column;
+                                        gap: 8px;
+                              }
+
+                              .mode-btn {
+                                        display: flex;
+                                        align-items: center;
+                                        gap: 10px;
+                                        width: 100%;
+                                        background: var(--panel-alt);
+                                        border: 1px solid var(--line);
+                                        color: var(--text-dim);
+                                        font-family: var(--font-mono);
+                                        font-size: 13px;
+                                        padding: 10px 12px;
+                                        border-radius: 8px;
+                                        cursor: pointer;
+                                        transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+                                        text-align: left;
+                              }
+
+                              .mode-btn:hover {
+                                        border-color: var(--text-faint);
+                                        color: var(--text);
+                              }
+
+                              .mode-btn .swatch {
+                                        width: 10px;
+                                        height: 10px;
+                                        border-radius: 3px;
+                                        flex-shrink: 0;
+                              }
+
+                              .mode-btn[data-mode="thermal"] .swatch {
+                                        background: linear-gradient(135deg, var(--heat-cool), var(--heat-mid), var(--heat-hot));
+                              }
+
+                              .mode-btn[data-mode="night_vision"] .swatch {
+                                        background: #35d07f;
+                              }
+
+                              .mode-btn[data-mode="normal"] .swatch {
+                                        background: var(--text-faint);
+                              }
+
+                              .mode-btn.active {
+                                        color: var(--text);
+                                        border-color: var(--text-faint);
+                                        background: #1c212b;
+                              }
+
+                              .readout {
+                                        display: flex;
+                                        flex-direction: column;
+                                        gap: 10px;
+                              }
+
+                              .readout-row {
+                                        display: flex;
+                                        justify-content: space-between;
+                                        font-size: 12.5px;
+                                        padding-bottom: 10px;
+                                        border-bottom: 1px solid var(--line);
+                              }
+
+                              .readout-row:last-child {
+                                        border-bottom: none;
+                                        padding-bottom: 0;
+                              }
+
+                              .readout-row .label {
+                                        color: var(--text-dim);
+                              }
+
+                              .readout-row .value {
+                                        color: var(--text);
+                              }
+
+                              .note {
+                                        font-family: var(--font-mono);
+                                        font-size: 12px;
+                                        line-height: 1.6;
+                                        color: var(--text-dim);
+                              }
+
+                              .note strong {
+                                        color: var(--text);
+                                        font-weight: 500;
+                              }
+
+                              .heat-strip {
+                                        height: 3px;
+                                        border-radius: 3px;
+                                        margin-top: 4px;
+                                        background: linear-gradient(90deg, var(--heat-cool), var(--heat-mid), var(--heat-hot));
+                                        opacity: 0.9;
+                              }
+
+                              footer {
+                                        margin-top: 24px;
+                                        padding-top: 16px;
+                                        border-top: 1px solid var(--line);
+                                        font-size: 11.5px;
+                                        color: var(--text-faint);
+                                        display: flex;
+                                        justify-content: space-between;
+                                        flex-wrap: wrap;
+                                        gap: 6px 16px;
+                              }
+
+                              @media (max-width: 760px) {
+                                        main {
+                                                  grid-template-columns: 1fr;
+                                        }
+
+                                        body {
+                                                  padding: 20px 16px 32px;
+                                        }
+                              }
+                    </style>
+          </head>
+
+          <body>
+                    <div class="wrap">
+                              <header>
+                                        <div class="title-block">
+                                                  <h1>Vision Relay</h1>
+                                                  <p>False-color and low-light rendering computed from a standard webcam
+                                                            feed — no thermal or IR sensor involved.</p>
+                                        </div>
+                                        <div class="live-badge"><span class="live-dot"></span>Feed active</div>
+                              </header>
+
+                              <main>
+                                        <div class="feed-panel">
+                                                  <img src="/video_feed" alt="Live processed camera feed">
+                                                  <div class="feed-overlay">
+                                                            <div class="row">
+                                                                      <span id="modeReadout">Mode: Thermal
+                                                                                simulation</span>
+                                                                      <span>Standard RGB sensor</span>
+                                                            </div>
+                                                            <div class="row">
+                                                                      <span>Local relay</span>
+                                                                      <span id="clock"></span>
+                                                            </div>
+                                                  </div>
+                                                  <div class="frame-corners">
+                                                            <span></span><span></span><span></span><span></span>
+                                                  </div>
+                                        </div>
+
+                                        <div class="side">
+                                                  <div class="panel">
+                                                            <h2>Rendering mode</h2>
+                                                            <div class="modes">
+                                                                      <button class="mode-btn active"
+                                                                                data-mode="thermal"
+                                                                                onclick="setMode('thermal', this)">
+                                                                                <span class="swatch"></span>Thermal
+                                                                                simulation
+                                                                      </button>
+                                                                      <button class="mode-btn" data-mode="night_vision"
+                                                                                onclick="setMode('night_vision', this)">
+                                                                                <span class="swatch"></span>Night vision
+                                                                      </button>
+                                                                      <button class="mode-btn" data-mode="normal"
+                                                                                onclick="setMode('normal', this)">
+                                                                                <span class="swatch"></span>Normal view
+                                                                      </button>
+                                                            </div>
+                                                            <div class="heat-strip"></div>
+                                                  </div>
+
+                                                  <div class="panel">
+                                                            <h2>Readout</h2>
+                                                            <div class="readout">
+                                                                      <div class="readout-row"><span
+                                                                                          class="label">Sensor</span><span
+                                                                                          class="value">Simulated — RGB
+                                                                                          webcam</span></div>
+                                                                      <div class="readout-row"><span
+                                                                                          class="label">Active
+                                                                                          mode</span><span class="value"
+                                                                                          id="readoutMode">Thermal
+                                                                                          simulation</span></div>
+                                                                      <div class="readout-row"><span
+                                                                                          class="label">Method</span><span
+                                                                                          class="value"
+                                                                                          id="readoutMethod">CLAHE + JET
+                                                                                          colormap</span></div>
+                                                            </div>
+                                                  </div>
+
+                                                  <div class="panel">
+                                                            <p class="note"><strong>No thermal hardware.</strong> This
+                                                                      project has no infrared or thermal sensor. Each
+                                                                      mode is a false-color or contrast simulation
+                                                                      computed in software from ordinary camera light,
+                                                                      meant to resemble thermal or night-vision output
+                                                                      for demo and learning purposes — not for real
+                                                                      temperature measurement.</p>
+                                                  </div>
+                                        </div>
+                              </main>
+
+                              <footer>
+                                        <span>Vision Relay — webcam vision simulation</span>
+                                        <span>Flask · OpenCV</span>
+                              </footer>
+                    </div>
+
+                    <script>
+                              const modeMeta = {
+                                        thermal: { readout: 'Mode: Thermal simulation', panel: 'Thermal simulation', method: 'CLAHE + JET colormap' },
+                                        night_vision: { readout: 'Mode: Night vision', panel: 'Night vision', method: 'CLAHE, green-channel isolate' },
+                                        normal: { readout: 'Mode: Normal view', panel: 'Normal view', method: 'Unprocessed passthrough' }
+                              };
+
+                              function setMode(mode, el) {
+                                        fetch('/set_mode/' + mode)
+                                                  .then(res => res.json())
+                                                  .then(data => {
+                                                            if (data.status !== 'success') return;
+                                                            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                                                            el.classList.add('active');
+                                                            document.getElementById('modeReadout').textContent = modeMeta[mode].readout;
+                                                            document.getElementById('readoutMode').textContent = modeMeta[mode].panel;
+                                                            document.getElementById('readoutMethod').textContent = modeMeta[mode].method;
+
+                                                            const strip = document.querySelector('.heat-strip');
+                                                            strip.style.transition = 'none';
+                                                            strip.style.opacity = '0.2';
+                                                            requestAnimationFrame(() => {
+                                                                      strip.style.transition = 'opacity 0.5s ease';
+                                                                      strip.style.opacity = '0.9';
+                                                            });
+                                                  })
+                                                  .catch(() => { });
+                              }
+
+                              function tick() {
+                                        const el = document.getElementById('clock');
+                                        if (el) el.textContent = new Date().toLocaleTimeString();
+                              }
+                              tick();
+                              setInterval(tick, 1000);
+                    </script>
+          </body>
+
+</html>
