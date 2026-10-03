@@ -1,3 +1,4 @@
+
 # Vision Relay
 
 A small Flask + OpenCV app that streams your webcam through three rendering modes — a false-color "thermal" simulation, a green-channel night-vision look, and a normal passthrough.
@@ -6,13 +7,25 @@ A small Flask + OpenCV app that streams your webcam through three rendering mode
 
 ## How it works
 
-| Mode | Technique |
-|---|---|
-| Thermal simulation | Gamma correction → CLAHE contrast boost on luminance → bilateral denoise → invert → `COLORMAP_JET` |
-| Night vision | Grayscale → CLAHE contrast boost → mapped onto the green channel only |
-| Normal | Unprocessed camera frame |
+| Mode               | Technique                                                                                               |
+| ------------------ | ------------------------------------------------------------------------------------------------------- |
+| Thermal simulation | Gamma correction → CLAHE contrast boost on luminance → bilateral denoise → invert →`COLORMAP_JET` |
+| Night vision       | Grayscale → CLAHE contrast boost → mapped onto the green channel only                                 |
+| Normal             | Unprocessed camera frame                                                                                |
 
 The backend exposes the processed feed as an MJPEG stream; the frontend is a single dashboard page with live mode switching.
+
+### Isolating the subject from the background
+
+By default, the effect is only rendered on whatever is moving in frame — the still background stays dark, closer to how a real thermal camera makes a warm body stand out against a cooler room. This is done with `cv2.createBackgroundSubtractorMOG2`: it learns what the static background looks like over the first second or two, then flags anything that differs from it (after cleaning up the mask with thresholding and morphological open/dilate) as foreground, and only that region gets the colormap — everything else is masked to black.
+
+This is motion-based background subtraction, not person detection — it doesn't know what a person looks like, it just knows what's new. That means:
+
+- It works best if the room is still for a moment when the stream starts, so it can learn the background.
+- Anything that moves (a hand, a pet, a passing shadow) will also show up, not just you.
+- If you stand completely still for a long time, you can gradually blend into the learned background and partially disappear — move around occasionally to stay "visible."
+
+This can be toggled off from the dashboard (**Background** panel) to go back to rendering the effect over the whole frame.
 
 ## Project structure
 

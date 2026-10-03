@@ -265,6 +265,10 @@
                                         background: var(--text-faint);
                               }
 
+                              #isolateSwatch {
+                                        background: #35d07f;
+                              }
+
                               .mode-btn.active {
                                         color: var(--text);
                                         border-color: var(--text-faint);
@@ -395,6 +399,23 @@
                                                   </div>
 
                                                   <div class="panel">
+                                                            <h2>Background</h2>
+                                                            <button class="mode-btn active" id="isolateBtn"
+                                                                      onclick="toggleIsolate()">
+                                                                      <span class="swatch" id="isolateSwatch"></span>
+                                                                      <span id="isolateLabel">Isolate subject: on</span>
+                                                            </button>
+                                                            <p class="note" style="margin-top: 10px;">Detects what's
+                                                                      moving against the room and only renders the
+                                                                      effect there — the still background stays dark.
+                                                                      It's motion-based, not real person detection, so
+                                                                      anything that moves (not just you) will show, and
+                                                                      it works best after a second or two of the room
+                                                                      sitting still so it can learn what "background"
+                                                                      looks like.</p>
+                                                  </div>
+
+                                                  <div class="panel">
                                                             <h2>Readout</h2>
                                                             <div class="readout">
                                                                       <div class="readout-row"><span
@@ -411,6 +432,11 @@
                                                                                           class="value"
                                                                                           id="readoutMethod">CLAHE + JET
                                                                                           colormap</span></div>
+                                                                      <div class="readout-row"><span
+                                                                                          class="label">Background</span><span
+                                                                                          class="value"
+                                                                                          id="readoutIsolate">Isolated</span>
+                                                                      </div>
                                                             </div>
                                                   </div>
 
@@ -457,6 +483,23 @@
                                                                       strip.style.transition = 'opacity 0.5s ease';
                                                                       strip.style.opacity = '0.9';
                                                             });
+                                                  })
+                                                  .catch(() => { });
+                              }
+
+                              let isolateOn = true;
+
+                              function toggleIsolate() {
+                                        const next = !isolateOn;
+                                        fetch('/set_isolate/' + (next ? 'on' : 'off'))
+                                                  .then(res => res.json())
+                                                  .then(data => {
+                                                            if (data.status !== 'success') return;
+                                                            isolateOn = data.isolate;
+                                                            document.getElementById('isolateBtn').classList.toggle('active', isolateOn);
+                                                            document.getElementById('isolateLabel').textContent = 'Isolate subject: ' + (isolateOn ? 'on' : 'off');
+                                                            document.getElementById('isolateSwatch').style.background = isolateOn ? '#35d07f' : 'var(--text-faint)';
+                                                            document.getElementById('readoutIsolate').textContent = isolateOn ? 'Isolated' : 'Full frame';
                                                   })
                                                   .catch(() => { });
                               }

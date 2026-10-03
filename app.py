@@ -8,9 +8,12 @@ app = Flask(__name__)
 
 VALID_MODES = ("thermal", "night_vision", "normal")
 current_mode = "thermal"
+isolate_subject = True
 
 camera = None
 clahe = cv2.createCLAHE(clipLimit=3.5, tileGridSize=(8, 8))
+bg_subtractor = cv2.createBackgroundSubtractorMOG2(history=500, varThreshold=16, detectShadows=True)
+morph_kernel = np.ones((5, 5), np.uint8)
 
 
 def get_camera():
@@ -46,6 +49,14 @@ def render_night_vision(frame):
     return output_frame
 
 
+def update_subject_mask(frame):
+    raw_mask = bg_subtractor.apply(frame)
+    _, clean_mask = cv2.threshold(raw_mask, 200, 255, cv2.THRESH_BINARY)
+    clean_mask = cv2.morphologyEx(clean_mask, cv2.MORPH_OPEN, morph_kernel)
+    clean_mask = cv2.morphologyEx(clean_mask, cv2.MORPH_DILATE, morph_kernel, iterations=2)
+    return clean_mask
+
+
 def render_frame(frame, mode):
     if mode == "thermal":
         return render_thermal(frame)
@@ -73,10 +84,16 @@ def generate_frames():
         consecutive_failures = 0
         frame = cv2.flip(frame, 1)
 
+        subject_mask = update_subject_mask(frame)
+
         try:
             output_frame = render_frame(frame, current_mode)
         except cv2.error:
             output_frame = frame
+
+        if isolate_subject:
+            mask_3ch = cv2.cvtColor(subject_mask, cv2.COLOR_GRAY2BGR)
+            output_frame = cv2.bitwise_and(output_frame, mask_3ch)
 
         ok, buffer = cv2.imencode(".jpg", output_frame)
         if not ok:
@@ -117,6 +134,15 @@ def set_mode(mode):
     return jsonify(status="success", mode=current_mode)
 
 
+@app.route("/set_isolate/<state>")
+def set_isolate(state):
+    global isolate_subject
+    if state not in ("on", "off"):
+        return jsonify(status="error", message="use on or off", isolate=isolate_subject), 400
+    isolate_subject = state == "on"
+    return jsonify(status="success", isolate=isolate_subject)
+
+
 @app.route("/status")
 def status():
     cam = get_camera()
@@ -124,6 +150,7 @@ def status():
         mode=current_mode,
         camera_connected=cam.isOpened(),
         sensor="simulated (standard RGB webcam)",
+        isolate_subject=isolate_subject,
     )
 
 
